@@ -1,0 +1,33 @@
+{% extends "reviews/base.html" %}
+{% block title %}{{ movie.title }}{% endblock %}
+{% block content %}
+<p><a href="{% url 'dashboard' %}">← All movies</a></p>
+<h1>{{ movie.title }}</h1><p class="sub">{{ movie.genre }} · {{ movie.product_id }}</p>
+
+{% if trust %}
+<div class="cards">
+  <div class="card"><div class="k">Verified trust score</div><div class="v mono {{ trust.grade }}">{{ trust.trust_score|floatformat:1 }}</div></div>
+  <div class="card"><div class="k">Raw → verified rating</div><div class="v mono">{{ trust.raw_avg|floatformat:2 }} → {{ trust.verified_avg|floatformat:2 }}</div></div>
+  <div class="card"><div class="k">Fake reviews</div><div class="v mono">{{ trust.n_flagged }} / {{ trust.n_reviews }}</div></div>
+  <div class="card"><div class="k">Status</div><div class="v">{% if trust.manipulated %}<span class="fake">⚠ Manipulated</span>{% else %}<span class="genuine">Clean</span>{% endif %}</div></div>
+</div>
+{% endif %}
+
+<h2>Rating distribution: genuine vs flagged</h2>
+<table><tr><th>Stars</th><th>Genuine</th><th>Flagged fake</th></tr>
+{% for r in dist %}<tr><td>{{ r.star }}★</td><td class="mono">{{ r.genuine }}</td><td class="mono fake">{{ r.fake }}</td></tr>{% endfor %}</table>
+
+<h2>Reviews</h2>
+<p class="tabs"><a class="{% if view == 'flagged' %}on{% endif %}" href="?view=flagged">Flagged</a>
+<a class="{% if view == 'genuine' %}on{% endif %}" href="?view=genuine">Genuine</a>
+<a class="{% if view == 'all' %}on{% endif %}" href="?view=all">All</a></p>
+<div class="scroll"><table>
+<tr><th>User</th><th>★</th><th>Review</th><th>Acct age</th><th>P(fake)</th></tr>
+{% for r in reviews %}
+<tr><td class="mono">{{ r.user_id }}</td><td>{{ r.rating }}</td>
+<td>{{ r.review_text }}{% if r.reason_list %}<div>{% for x in r.reason_list %}<span class="reason">{{ x }}</span>{% endfor %}</div>{% endif %}</td>
+<td class="mono">{{ r.account_age_days }}d</td>
+<td class="mono {% if r.predicted_fake %}fake{% else %}genuine{% endif %}"><b>{{ r.fake_probability|floatformat:2 }}</b></td></tr>
+{% empty %}<tr><td colspan="5">Nothing to show.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

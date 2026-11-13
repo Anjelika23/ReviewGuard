@@ -1,0 +1,114 @@
+{
+  "holdout": {
+    "text": {
+      "accuracy": 0.8292945611200861,
+      "precision": 0.8564814814814815,
+      "recall": 0.592,
+      "f1": 0.7000946073793756,
+      "roc_auc": 0.8157662337662338,
+      "pr_auc": 0.7694939959907628,
+      "confusion_matrix": [
+        [
+          1170,
+          62
+        ],
+        [
+          255,
+          370
+        ]
+      ]
+    },
+    "behavior": {
+      "accuracy": 0.9273021001615509,
+      "precision": 0.926829268292683,
+      "recall": 0.8512,
+      "f1": 0.8874061718098415,
+      "roc_auc": 0.9603649350649351,
+      "pr_auc": 0.9462428903954051,
+      "confusion_matrix": [
+        [
+          1190,
+          42
+        ],
+        [
+          93,
+          532
+        ]
+      ]
+    },
+    "dual": {
+      "accuracy": 0.9402261712439418,
+      "precision": 0.9461805555555556,
+      "recall": 0.872,
+      "f1": 0.9075770191507078,
+      "roc_auc": 0.9599,
+      "pr_auc": 0.9387129198855815,
+      "confusion_matrix": [
+        [
+          1201,
+          31
+        ],
+        [
+          80,
+          545
+        ]
+      ]
+    }
+  },
+  "top_features": [
+    [
+      "user_extreme_share",
+      0.0476
+    ],
+    [
+      "text_prob",
+      0.0424
+    ],
+    [
+      "user_mean_rating",
+      0.0171
+    ],
+    [
+      "account_age_days",
+      0.0116
+    ],
+    [
+      "product_new_acct_share",
+      0.0093
+    ],
+    [
+      "user_review_count",
+      0.0039
+    ],
+    [
+      "user_reviews_per_month",
+      0.003
+    ],
+    [
+      "product_abs_dev",
+      0.0015
+    ],
+    [
+      "sentiment_rating_gap",
+      0.001
+    ],
+    [
+      "user_rating_std",
+      0.001
+    ],
+    [
+      "rating",
+      0.0005
+    ],
+    [
+      "product_dev",
+      0.0005
+    ]
+  ],
+  "trust_rating_error": {
+    "raw": 0.435,
+    "verified": 0.048
+  },
+  "n_reviews": 7426,
+  "fake_rate": 0.337
+}

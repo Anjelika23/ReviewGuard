@@ -1,0 +1,15 @@
+{% extends "reviews/base.html" %}
+{% block content %}
+<h1>Analyze a review</h1><p class="sub">Evaluate a review using text patterns and available account/movie behaviour. Results are risk estimates, not proof of fraud.</p>
+<div class="row"><div class="card">
+<form method="post">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="error">{{ form.non_field_errors }}</div>{% endif %}
+  <label for="id_movie">Movie</label><select id="id_movie" name="movie" required>{% for m in movies %}<option value="{{ m.product_id }}" {% if form.movie.value == m.product_id %}selected{% endif %}>{{ m.title }}</option>{% endfor %}</select>{{ form.movie.errors }}
+  <div class="row"><div><label for="id_user_id">User ID (optional)</label><input id="id_user_id" name="user_id" maxlength="64" value="{{ form.user_id.value|default:'U_demo' }}"></div>
+  <div><label for="id_account_age_days">Account age (days)</label><input id="id_account_age_days" type="number" min="0" max="36500" name="account_age_days" value="{{ form.account_age_days.value|default:'3' }}" required>{{ form.account_age_days.errors }}</div></div>
+  <label for="id_rating">Rating</label><select id="id_rating" name="rating" required>{% for i in "54321" %}<option value="{{ i }}" {% if form.rating.value|stringformat:'s' == i %}selected{% endif %}>{{ i }} ★</option>{% endfor %}</select>{{ form.rating.errors }}
+  <label for="id_review_text">Review text</label><textarea id="id_review_text" name="review_text" rows="5" minlength="3" maxlength="5000" required>{{ form.review_text.value|default:"Best movie ever!!! Must watch, 10/10, highly recommended!" }}</textarea>{{ form.review_text.errors }}
+  <button type="submit">Analyze review</button>
+</form></div>
+<div class="card result-card">{% if result %}<div class="k">Risk assessment</div><div class="v {% if result.is_fake %}fake{% else %}genuine{% endif %}">{{ result.label }}</div><p class="mono">Fake-review probability: <b>{{ result.fake_probability }}</b></p>{% if result.reasons %}<div class="k">Signals detected</div>{% for r in result.reasons %}<div class="reason">{{ r }}</div>{% endfor %}{% else %}<p class="sub">No strong explanatory signals were detected.</p>{% endif %}<p class="sub">Automated predictions can be wrong. Review context before taking action.</p>{% else %}<p class="sub">Submit a review to see its risk assessment and detected signals.</p>{% endif %}</div></div>
+{% endblock %}

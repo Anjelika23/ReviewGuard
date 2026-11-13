@@ -1,0 +1,41 @@
+{% extends "reviews/base.html" %}
+{% block content %}
+<h1>Verified Trust Scores</h1>
+<p class="sub">Movie ratings after bot-generated 5★ and competitor-sabotage 1★ reviews are filtered out.</p>
+
+<div class="cards">
+  <div class="card"><div class="k">Reviews analysed</div><div class="v mono">{{ total }}</div></div>
+  <div class="card"><div class="k">Flagged as fake</div><div class="v mono">{{ flagged }} <small style="font-size:14px;color:var(--mute)">({{ pct|floatformat:1 }}%)</small></div></div>
+  <div class="card"><div class="k">Movies manipulated</div><div class="v mono">{{ n_manip }}</div></div>
+  <div class="card"><div class="k">Avg rating inflation</div><div class="v mono">{{ avg_infl|floatformat:2 }}★</div></div>
+</div>
+
+<h2>Movies</h2>
+<div class="scroll"><table>
+<tr><th>Movie</th><th>Reviews</th><th>Flagged</th><th>Raw ★</th><th>Verified ★</th><th style="width:200px">Trust score</th><th>Grade</th><th></th></tr>
+{% for s in scores %}
+<tr>
+  <td><a href="{% url 'movie_detail' s.movie.product_id %}">{{ s.movie.title }}</a><div class="sub" style="margin:0;font-size:12px">{{ s.movie.genre }}</div></td>
+  <td class="mono">{{ s.n_reviews }}</td>
+  <td class="mono">{{ s.n_flagged }} ({% widthratio s.fake_share 1 100 %}%)</td>
+  <td class="mono">{{ s.raw_avg|floatformat:2 }}</td>
+  <td class="mono"><b>{{ s.verified_avg|floatformat:2 }}</b></td>
+  <td><div class="mono"><b>{{ s.trust_score|floatformat:1 }}</b></div>
+      <div class="bar"><i class="{{ s.grade }}" style="width:{{ s.trust_score }}%;background:currentColor"></i></div></td>
+  <td><span class="pill {{ s.grade }}">{{ s.grade }}</span></td>
+  <td>{% if s.manipulated %}<span class="pill fake">⚠ manipulated</span>{% endif %}</td>
+</tr>
+{% empty %}<tr><td colspan="8">No data yet. Run <code>python manage.py import_reviews</code>.</td></tr>{% endfor %}
+</table></div>
+
+{% if metrics %}
+<h2>Model performance (held-out 25%)</h2>
+<div class="scroll"><table>
+<tr><th>Feature set</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th><th>ROC-AUC</th></tr>
+{% for name, m in metrics.holdout.items %}
+<tr><td>{% if name == "dual" %}<b>dual (text + behaviour)</b>{% else %}{{ name }} only{% endif %}</td>
+<td class="mono">{{ m.accuracy|floatformat:3 }}</td><td class="mono">{{ m.precision|floatformat:3 }}</td>
+<td class="mono">{{ m.recall|floatformat:3 }}</td><td class="mono">{{ m.f1|floatformat:3 }}</td><td class="mono">{{ m.roc_auc|floatformat:3 }}</td></tr>
+{% endfor %}</table></div>
+{% endif %}
+{% endblock %}

@@ -1,33 +1,245 @@
 {% extends "reviews/base.html" %}
-{% block title %}{{ movie.title }}{% endblock %}
+{% block title %}{{ movie.title }} — Trust Score & Review Audit | ReviewGuard{% endblock %}
+
 {% block content %}
-<p><a href="{% url 'dashboard' %}">← All movies</a></p>
-<h1>{{ movie.title }}</h1><p class="sub">{{ movie.genre }} · {{ movie.product_id }}</p>
+<div style="margin-bottom:16px">
+  <a href="{% url 'dashboard' %}" class="btn btn-outline" style="padding:6px 14px;font-size:13px">← Back to Dashboard</a>
+</div>
+
+<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:24px">
+  <div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+      <h1 style="margin-bottom:0">{{ movie.title }}</h1>
+      <span class="reason" style="font-size:13px;padding:3px 10px">{{ movie.genre|default:"Unclassified" }}</span>
+    </div>
+    <p class="sub" style="margin-bottom:0">Product ID: <span class="mono">{{ movie.product_id }}</span> • In-depth audit of user velocity, text authenticity, and rating credibility.</p>
+  </div>
+  <div>
+    <a href="{% url 'analyze' %}?movie={{ movie.product_id }}" class="btn">⚡ Score New Review For This Movie</a>
+  </div>
+</div>
 
 {% if trust %}
+<!-- Trust Score Overview Cards -->
 <div class="cards">
-  <div class="card"><div class="k">Verified trust score</div><div class="v mono {{ trust.grade }}">{{ trust.trust_score|floatformat:1 }}</div></div>
-  <div class="card"><div class="k">Raw → verified rating</div><div class="v mono">{{ trust.raw_avg|floatformat:2 }} → {{ trust.verified_avg|floatformat:2 }}</div></div>
-  <div class="card"><div class="k">Fake reviews</div><div class="v mono">{{ trust.n_flagged }} / {{ trust.n_reviews }}</div></div>
-  <div class="card"><div class="k">Status</div><div class="v">{% if trust.manipulated %}<span class="fake">⚠ Manipulated</span>{% else %}<span class="genuine">Clean</span>{% endif %}</div></div>
+  <div class="card">
+    <div class="k"><span>🛡️</span> Verified Trust Score</div>
+    <div class="v mono {{ trust.grade }}">
+      {{ trust.trust_score|floatformat:1 }} <small style="font-size:14px;color:var(--text-muted)">/ 100</small>
+    </div>
+    <div style="margin-top:8px;display:flex;align-items:center;gap:8px">
+      <span class="pill {{ trust.grade }}">{{ trust.grade }}</span>
+      <span class="hint" style="margin:0">Credibility-weighted Bayesian index</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="k"><span>⚖️</span> Star Rating Correction</div>
+    <div class="v mono" style="font-size:24px">
+      <span style="color:var(--text-muted);text-decoration:line-through">{{ trust.raw_avg|floatformat:2 }}★</span>
+      <span style="font-size:20px"> → </span>
+      <span style="color:var(--brand);font-weight:800">{{ trust.verified_avg|floatformat:2 }}★</span>
+    </div>
+    <div class="hint">
+      {% if trust.rating_inflation > 0 %}
+        <span style="color:var(--bad);font-weight:700">+{{ trust.rating_inflation|floatformat:2 }}★</span> artificial star inflation purged
+      {% elif trust.rating_inflation < 0 %}
+        <span style="color:var(--good);font-weight:700">{{ trust.rating_inflation|floatformat:2 }}★</span> review sabotage suppressed
+      {% else %}
+        No statistical inflation observed
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="k"><span>🚫</span> Synthetic / Fake Reviews</div>
+    <div class="v mono">
+      {{ trust.n_flagged }} <small style="font-size:16px;color:var(--text-muted)">/ {{ trust.n_reviews }}</small>
+    </div>
+    <div class="hint">
+      <span class="mono" style="font-weight:700;color:var(--bad)">{% widthratio trust.fake_share 1 100 %}%</span> of total submitted reviews flagged
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="k"><span>🔍</span> Integrity Assessment</div>
+    <div class="v" style="font-size:22px;margin-top:8px">
+      {% if trust.manipulated %}
+        <span class="pill fake" style="font-size:14px;padding:4px 12px">⚠️ Manipulation Alert</span>
+      {% else %}
+        <span class="pill genuine" style="font-size:14px;padding:4px 12px">✓ Verified Organic</span>
+      {% endif %}
+    </div>
+    <div class="hint">
+      {% if trust.manipulated %}
+        Abnormal cluster of low-credibility new accounts detected.
+      {% else %}
+        Review distribution matches normal organic consumer behavior.
+      {% endif %}
+    </div>
+  </div>
 </div>
 {% endif %}
 
-<h2>Rating distribution: genuine vs flagged</h2>
-<table><tr><th>Stars</th><th>Genuine</th><th>Flagged fake</th></tr>
-{% for r in dist %}<tr><td>{{ r.star }}★</td><td class="mono">{{ r.genuine }}</td><td class="mono fake">{{ r.fake }}</td></tr>{% endfor %}</table>
+<!-- Rating Distribution: Genuine vs Fake Chart -->
+<h2><span>📊</span> Star Rating Distribution (Genuine vs Fake Breakdown)</h2>
+<div class="card" style="margin-bottom:32px">
+  <div style="display:flex;flex-direction:column;gap:14px">
+    {% for r in dist %}
+    <div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:4px">
+        <span>{{ r.star }} ★ Stars ({{ r.total }} reviews • {{ r.pct }}%)</span>
+        <span class="mono" style="font-size:12px">
+          <span style="color:var(--good)">{{ r.genuine }} Genuine</span> •
+          <span style="color:var(--bad)">{{ r.fake }} Flagged</span>
+        </span>
+      </div>
+      <div style="display:flex;height:12px;border-radius:6px;background:var(--border);overflow:hidden">
+        {% if r.total > 0 %}
+          <div style="background:var(--good);width:{% widthratio r.genuine total_reviews 100 %}%;height:100%" title="{{ r.genuine }} Genuine reviews"></div>
+          <div style="background:var(--bad);width:{% widthratio r.fake total_reviews 100 %}%;height:100%" title="{{ r.fake }} Fake reviews"></div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <div style="display:flex;gap:18px;margin-top:16px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:12px">
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="width:10px;height:10px;border-radius:3px;background:var(--good)"></span> Genuine Reviews
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="width:10px;height:10px;border-radius:3px;background:var(--bad)"></span> Flagged Fake Reviews
+    </div>
+  </div>
+</div>
 
-<h2>Reviews</h2>
-<p class="tabs"><a class="{% if view == 'flagged' %}on{% endif %}" href="?view=flagged">Flagged</a>
-<a class="{% if view == 'genuine' %}on{% endif %}" href="?view=genuine">Genuine</a>
-<a class="{% if view == 'all' %}on{% endif %}" href="?view=all">All</a></p>
-<div class="scroll"><table>
-<tr><th>User</th><th>★</th><th>Review</th><th>Acct age</th><th>P(fake)</th></tr>
-{% for r in reviews %}
-<tr><td class="mono">{{ r.user_id }}</td><td>{{ r.rating }}</td>
-<td>{{ r.review_text }}{% if r.reason_list %}<div>{% for x in r.reason_list %}<span class="reason">{{ x }}</span>{% endfor %}</div>{% endif %}</td>
-<td class="mono">{{ r.account_age_days }}d</td>
-<td class="mono {% if r.predicted_fake %}fake{% else %}genuine{% endif %}"><b>{{ r.fake_probability|floatformat:2 }}</b></td></tr>
-{% empty %}<tr><td colspan="5">Nothing to show.</td></tr>{% endfor %}
-</table></div>
+<!-- Reviews Section -->
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+  <h2 style="margin:0"><span>💬</span> Review Explorer</h2>
+  <div style="font-size:13px;color:var(--text-muted)">
+    Showing {{ reviews.start_index }}-{{ reviews.end_index }} of {{ reviews.paginator.count }} reviews
+  </div>
+</div>
+
+<!-- Review Filter Controls -->
+<div class="card" style="padding:14px 18px;margin-bottom:18px">
+  <form method="get" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+    <div class="tabs" style="margin:0">
+      <a class="{% if view == 'all' %}on{% endif %}" href="?view=all{% if star %}&star={{ star }}{% endif %}{% if q %}&q={{ q }}{% endif %}">
+        All ({{ total_reviews }})
+      </a>
+      <a class="{% if view == 'flagged' %}on{% endif %}" href="?view=flagged{% if star %}&star={{ star }}{% endif %}{% if q %}&q={{ q }}{% endif %}">
+        Flagged Fake ({{ flagged_count }})
+      </a>
+      <a class="{% if view == 'genuine' %}on{% endif %}" href="?view=genuine{% if star %}&star={{ star }}{% endif %}{% if q %}&q={{ q }}{% endif %}">
+        Genuine ({{ genuine_count }})
+      </a>
+    </div>
+
+    <div style="margin-left:auto;display:flex;gap:10px;flex-wrap:wrap">
+      <select name="star" onchange="this.form.submit()" style="width:auto;padding:6px 10px;font-size:13px">
+        <option value="">All Star Ratings</option>
+        {% for s in "54321" %}
+          <option value="{{ s }}" {% if star == s %}selected{% endif %}>{{ s }} ★ Stars</option>
+        {% endfor %}
+      </select>
+      <input type="hidden" name="view" value="{{ view }}">
+      <input type="text" name="q" placeholder="Filter text or user ID..." value="{{ q }}" style="width:180px;padding:6px 10px;font-size:13px">
+      <button type="submit" style="padding:6px 12px;font-size:13px;margin:0">Search</button>
+      {% if star or q %}
+        <a href="?view={{ view }}" class="btn btn-outline" style="padding:6px 10px;font-size:12px;margin:0">Reset</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<!-- Reviews Table -->
+<div class="table-wrap">
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Reviewer</th>
+          <th>Rating</th>
+          <th>Review Content & Detected Signals</th>
+          <th>Account Age</th>
+          <th>Fake Risk P(fake)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in reviews %}
+        <tr>
+          <td style="white-space:nowrap">
+            <div class="mono" style="font-weight:700;font-size:13px">{{ r.user_id }}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+              {{ r.created_at|date:"M d, Y" }}
+            </div>
+          </td>
+          <td style="white-space:nowrap">
+            <span style="font-weight:800;font-size:14px;color:{% if r.rating >= 4 %}var(--good){% elif r.rating <= 2 %}var(--bad){% else %}var(--warn){% endif %}">
+              {{ r.rating }} ★
+            </span>
+          </td>
+          <td>
+            <div style="font-size:14px;line-height:1.5;margin-bottom:6px">
+              {{ r.review_text }}
+            </div>
+            {% if r.reason_list %}
+              <div style="margin-top:6px">
+                {% for signal in r.reason_list %}
+                  <span class="reason">{{ signal }}</span>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </td>
+          <td class="mono" style="white-space:nowrap">
+            <span {% if r.account_age_days < 14 %}style="color:var(--bad);font-weight:700"{% endif %}>
+              {{ r.account_age_days }} days
+            </span>
+          </td>
+          <td style="white-space:nowrap">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="mono" style="font-weight:800;font-size:14px;color:{% if r.predicted_fake %}var(--bad){% else %}var(--good){% endif %}">
+                {{ r.fake_probability|floatformat:2 }}
+              </span>
+              <span class="pill {% if r.predicted_fake %}fake{% else %}genuine{% endif %}" style="font-size:10.5px;padding:1px 6px">
+                {% if r.predicted_fake %}Fake{% else %}Genuine{% endif %}
+              </span>
+            </div>
+            <div class="bar" style="min-width:60px">
+              <i style="width:{% widthratio r.fake_probability 1 100 %}%;background:{% if r.predicted_fake %}var(--bad){% else %}var(--good){% endif %}"></i>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" style="text-align:center;padding:36px 20px">
+            <div style="font-size:24px;margin-bottom:6px">📭</div>
+            <div style="font-weight:700;margin-bottom:4px">No reviews match your current filters.</div>
+            <a href="?view=all" style="color:var(--brand);font-weight:600;font-size:13px">Clear all review filters</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination Bar -->
+  {% if reviews.has_other_pages %}
+  <div class="pagination">
+    <div>
+      Page {{ reviews.number }} of {{ reviews.paginator.num_pages }}
+    </div>
+    <div style="display:flex;gap:6px">
+      {% if reviews.has_previous %}
+        <a href="?page={{ reviews.previous_page_number }}&view={{ view }}{% if star %}&star={{ star }}{% endif %}{% if q %}&q={{ q }}{% endif %}">← Previous</a>
+      {% endif %}
+      {% if reviews.has_next %}
+        <a href="?page={{ reviews.next_page_number }}&view={{ view }}{% if star %}&star={{ star }}{% endif %}{% if q %}&q={{ q }}{% endif %}">Next →</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
 {% endblock %}

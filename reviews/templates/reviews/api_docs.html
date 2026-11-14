@@ -1,0 +1,121 @@
+{% extends "reviews/base.html" %}
+{% block title %}REST API Documentation — ReviewGuard{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:28px">
+  <div>
+    <h1>REST API Documentation</h1>
+    <p class="sub" style="margin-bottom:0">ReviewGuard provides low-latency RESTful APIs for real-time review inference, movie trust analytics, and health telemetry.</p>
+  </div>
+  <div>
+    <a href="/health/" target="_blank" class="btn btn-outline">⚡ Check Health Status</a>
+  </div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:32px">
+
+  <!-- Health Check Endpoint -->
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <span class="pill genuine" style="font-size:13px;padding:3px 10px">GET</span>
+      <span class="mono" style="font-size:16px;font-weight:700">/health/</span>
+      <span class="reason" style="margin-left:auto">Zero-Auth • Telemetry</span>
+    </div>
+    <p style="color:var(--text-secondary);margin-bottom:14px">
+      Health and orchestration probe. Used by cloud reverse proxies (Render, Kubernetes, AWS, Cloudflare) for liveliness and readiness probes.
+    </p>
+
+    <div class="k" style="margin-bottom:6px">Example Request</div>
+    <div style="background:var(--bg-card-subtle);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:var(--font-mono);font-size:13px;margin-bottom:14px">
+      curl -X GET https://your-domain.onrender.com/health/
+    </div>
+
+    <div class="k" style="margin-bottom:6px">Sample 200 OK Response</div>
+    <pre style="background:var(--bg-card-subtle);border:1px solid var(--border);border-radius:8px;padding:14px;font-family:var(--font-mono);font-size:12.5px;overflow-x:auto;margin:0">{
+  "status": "healthy",
+  "service": "ReviewGuard",
+  "version": "2.0.0",
+  "database": "connected",
+  "model_loaded": true,
+  "total_movies": 40,
+  "total_reviews": 7426
+}</pre>
+  </div>
+
+  <!-- Real-time Inference Endpoint -->
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <span class="pill" style="color:var(--brand);background:var(--brand-light);border-color:var(--brand);font-size:13px;padding:3px 10px">POST</span>
+      <span class="mono" style="font-size:16px;font-weight:700">/api/predict/</span>
+      <span class="reason" style="margin-left:auto">Stateless • CSRF Exempt</span>
+    </div>
+    <p style="color:var(--text-secondary);margin-bottom:14px">
+      Evaluates an incoming review payload using dual-feature stacking (TF-IDF NLP stylometry + historical velocity context).
+    </p>
+
+    <div class="k" style="margin-bottom:6px">Example cURL Request</div>
+    <div style="background:var(--bg-card-subtle);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:var(--font-mono);font-size:12.5px;overflow-x:auto;margin-bottom:14px">curl -X POST https://your-domain.onrender.com/api/predict/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "movie": "{{ sample_id }}",
+    "user_id": "U_tester_99",
+    "rating": 5,
+    "review_text": "Best movie ever! 10/10 masterpiece, must watch, nothing negative!",
+    "account_age_days": 1
+  }'</div>
+
+    <div class="k" style="margin-bottom:6px">Sample 200 OK Prediction Response</div>
+    <pre style="background:var(--bg-card-subtle);border:1px solid var(--border);border-radius:8px;padding:14px;font-family:var(--font-mono);font-size:12.5px;overflow-x:auto;margin:0">{
+  "status": "success",
+  "movie": "{{ sample_id }}",
+  "prediction": {
+    "fake_probability": 0.8612,
+    "fake_percentage": 86.1,
+    "is_fake": true,
+    "risk_level": "Critical Risk",
+    "label": "Likely fake",
+    "reasons": [
+      "Generic, templated superlative language",
+      "Short extreme rating with no specifics",
+      "Very new account (1 day old)"
+    ]
+  }
+}</pre>
+  </div>
+
+  <!-- Trust Score Summary Endpoint -->
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <span class="pill genuine" style="font-size:13px;padding:3px 10px">GET</span>
+      <span class="mono" style="font-size:16px;font-weight:700">/api/trust/&lt;product_id&gt;/</span>
+      <span class="reason" style="margin-left:auto">Analytics Query</span>
+    </div>
+    <p style="color:var(--text-secondary);margin-bottom:14px">
+      Returns the Verified Trust Score, inflation delta, and review integrity metrics for any catalog item.
+    </p>
+
+    <div class="k" style="margin-bottom:6px">Example Request</div>
+    <div style="background:var(--bg-card-subtle);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:var(--font-mono);font-size:13px;margin-bottom:14px">
+      curl -X GET https://your-domain.onrender.com/api/trust/{{ sample_id }}/
+    </div>
+
+    <div class="k" style="margin-bottom:6px">Sample 200 OK Response</div>
+    <pre style="background:var(--bg-card-subtle);border:1px solid var(--border);border-radius:8px;padding:14px;font-family:var(--font-mono);font-size:12.5px;overflow-x:auto;margin:0">{
+  "product_id": "{{ sample_id }}",
+  "title": "Movie Title",
+  "genre": "Sci-Fi",
+  "verified_trust_score": 81.4,
+  "grade": "Excellent",
+  "raw_avg": 4.62,
+  "verified_avg": 4.18,
+  "rating_inflation": 0.44,
+  "reviews": 185,
+  "flagged_fake": 28,
+  "fake_share": 0.151,
+  "manipulated": false,
+  "updated_at": "2026-11-13T20:58:00"
+}</pre>
+  </div>
+
+</div>
+{% endblock %}

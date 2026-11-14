@@ -17,6 +17,12 @@ COLS = ["id", "user_id", "movie_id", "rating", "review_text", "account_age_days"
 
 @lru_cache(maxsize=1)
 def get_detector() -> FakeReviewDetector:
+    if not settings.MODEL_PATH.exists():
+        csv_path = settings.BASE_DIR / "data" / "reviews.csv"
+        if csv_path.exists():
+            from ml.train import main as train_model
+            settings.MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+            train_model(str(csv_path), str(settings.MODEL_PATH.parent))
     det = FakeReviewDetector.load(settings.MODEL_PATH)
     det.threshold = settings.FAKE_THRESHOLD
     return det
@@ -67,8 +73,24 @@ def score_single(movie_id, user_id, rating, text, account_age_days, ip=None, dev
                          "review_text": text, "account_age_days": account_age_days,
                          "review_length": len(text), "ip_address": ip, "device_id": device}])
     df = new if ctx.empty else pd.concat([ctx, new], ignore_index=True)
-    feats = build_features(df)
+    feats = build_features(df, target_index=-1)
     p = float(det.predict_proba(feats.iloc[[-1]])[0])
-    return {"fake_probability": round(p, 4), "is_fake": p >= det.threshold,
-            "label": "Likely fake" if p >= det.threshold else "Likely genuine",
-            "reasons": det.explain_row(feats.iloc[-1]) if p >= 0.35 else []}
+
+    if p >= 0.75:
+        risk_level = "Critical Risk"
+    elif p >= det.threshold:
+        risk_level = "High Risk"
+    elif p >= 0.35:
+        risk_level = "Moderate Suspicion"
+    else:
+        risk_level = "Low Risk / Genuine"
+
+    reasons = det.explain_row(feats.iloc[-1]) if p >= 0.35 else []
+    return {
+        "fake_probability": round(p, 4),
+        "fake_percentage": round(p * 100, 1),
+        "is_fake": p >= det.threshold,
+        "risk_level": risk_level,
+        "label": "Likely fake" if p >= det.threshold else "Likely genuine",
+        "reasons": reasons,
+    }

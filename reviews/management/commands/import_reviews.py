@@ -14,9 +14,13 @@ class Command(BaseCommand):
         p.add_argument("--movies", default="data/movies.csv")
         p.add_argument("--no-score", action="store_true")
         p.add_argument("--keep", action="store_true", help="Do not wipe existing reviews first")
+        p.add_argument("--if-empty", action="store_true", help="Only import if database has no reviews")
 
     @transaction.atomic
     def handle(self, *a, **o):
+        if o.get("if_empty") and Review.objects.exists():
+            self.stdout.write(self.style.SUCCESS(f"Database already contains {Review.objects.count()} reviews. Skipping import."))
+            return
         df = pd.read_csv(o["csv"])
         if not o["keep"]:
             Review.objects.all().delete()

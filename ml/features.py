@@ -23,12 +23,14 @@ TEXT_COLS = [
 CROSS_COLS = ["sentiment_rating_gap"]  # needs both text and rating
 
 
-def build_features(df: pd.DataFrame) -> pd.DataFrame:
+def build_features(df: pd.DataFrame, target_index: int = None) -> pd.DataFrame:
     """Return one feature row per review (index aligned with `df`).
 
     Aggregates (per user / per product / duplicates) are computed over the
     frame you pass in, so pass the full review history you want to reason over.
     Optional columns `ip_address` and `device_id` enable velocity features.
+    If `target_index` is provided, NLP text extraction is optimized to only
+    compute full stylometrics for the target row being scored.
     """
     missing = [c for c in REQUIRED if c not in df.columns]
     if missing:
@@ -80,7 +82,15 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
             f[out] = 0
 
     # ---- NLP
-    nlp = pd.DataFrame([text_features(t) for t in df["review_text"]], index=df.index)[TEXT_COLS]
+    if target_index is not None and len(df) > 0:
+        idx = (len(df) + target_index) if target_index < 0 else target_index
+        target_feat = text_features(df["review_text"].iloc[idx])
+        nlp_rows = [{c: 0.0 for c in TEXT_COLS} for _ in range(len(df))]
+        nlp_rows[idx] = target_feat
+        nlp = pd.DataFrame(nlp_rows, index=df.index)[TEXT_COLS]
+    else:
+        nlp = pd.DataFrame([text_features(t) for t in df["review_text"]], index=df.index)[TEXT_COLS]
+
     f = pd.concat([f, nlp], axis=1)
     rating_norm = (r - 3.0) / 2.0  # -1..1
     f["sentiment_rating_gap"] = (f["sentiment_score"].clip(-1, 1) - rating_norm).abs()

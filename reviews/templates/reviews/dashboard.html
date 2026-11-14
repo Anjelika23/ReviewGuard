@@ -1,41 +1,270 @@
 {% extends "reviews/base.html" %}
 {% block content %}
-<h1>Verified Trust Scores</h1>
-<p class="sub">Movie ratings after bot-generated 5★ and competitor-sabotage 1★ reviews are filtered out.</p>
 
-<div class="cards">
-  <div class="card"><div class="k">Reviews analysed</div><div class="v mono">{{ total }}</div></div>
-  <div class="card"><div class="k">Flagged as fake</div><div class="v mono">{{ flagged }} <small style="font-size:14px;color:var(--mute)">({{ pct|floatformat:1 }}%)</small></div></div>
-  <div class="card"><div class="k">Movies manipulated</div><div class="v mono">{{ n_manip }}</div></div>
-  <div class="card"><div class="k">Avg rating inflation</div><div class="v mono">{{ avg_infl|floatformat:2 }}★</div></div>
+<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:24px">
+  <div>
+    <h1>Verified Trust Intelligence</h1>
+    <p class="sub" style="margin-bottom:0">Eliminating syndicated bot reviews, incentivized 5★ spam, and competitor-sabotage 1★ campaigns using dual-feature stacking ML.</p>
+  </div>
+  <div>
+    <a href="{% url 'analyze' %}" class="btn">⚡ Analyze Live Review</a>
+  </div>
 </div>
 
-<h2>Movies</h2>
-<div class="scroll"><table>
-<tr><th>Movie</th><th>Reviews</th><th>Flagged</th><th>Raw ★</th><th>Verified ★</th><th style="width:200px">Trust score</th><th>Grade</th><th></th></tr>
-{% for s in scores %}
-<tr>
-  <td><a href="{% url 'movie_detail' s.movie.product_id %}">{{ s.movie.title }}</a><div class="sub" style="margin:0;font-size:12px">{{ s.movie.genre }}</div></td>
-  <td class="mono">{{ s.n_reviews }}</td>
-  <td class="mono">{{ s.n_flagged }} ({% widthratio s.fake_share 1 100 %}%)</td>
-  <td class="mono">{{ s.raw_avg|floatformat:2 }}</td>
-  <td class="mono"><b>{{ s.verified_avg|floatformat:2 }}</b></td>
-  <td><div class="mono"><b>{{ s.trust_score|floatformat:1 }}</b></div>
-      <div class="bar"><i class="{{ s.grade }}" style="width:{{ s.trust_score }}%;background:currentColor"></i></div></td>
-  <td><span class="pill {{ s.grade }}">{{ s.grade }}</span></td>
-  <td>{% if s.manipulated %}<span class="pill fake">⚠ manipulated</span>{% endif %}</td>
-</tr>
-{% empty %}<tr><td colspan="8">No data yet. Run <code>python manage.py import_reviews</code>.</td></tr>{% endfor %}
-</table></div>
+<!-- Hero Stats Cards -->
+<div class="cards">
+  <div class="card">
+    <div class="k"><span>📊</span> Reviews Analyzed</div>
+    <div class="v mono">{{ total }}</div>
+    <div class="hint">Across {{ total_movies }} catalog movies</div>
+  </div>
+  
+  <div class="card">
+    <div class="k"><span>🚫</span> Flagged As Fake</div>
+    <div class="v mono {{ pct|default:0|floatformat:0|slugify }}">
+      {{ flagged }}
+      <small style="font-size:15px;color:var(--bad);font-weight:700">({{ pct|floatformat:1 }}%)</small>
+    </div>
+    <div class="hint">Identified via dual behavioral + NLP stacking</div>
+  </div>
+  
+  <div class="card">
+    <div class="k"><span>⚠️</span> Manipulated Catalogs</div>
+    <div class="v mono" style="{% if n_manip > 0 %}color:var(--warn){% endif %}">
+      {{ n_manip }}
+    </div>
+    <div class="hint">Titles exhibiting coordinated rating distortion (>25% fake)</div>
+  </div>
+  
+  <div class="card">
+    <div class="k"><span>📉</span> Average Rating Inflation</div>
+    <div class="v mono">
+      +{{ avg_infl|floatformat:2 }}★
+    </div>
+    <div class="hint">Systemic artificial star inflation corrected</div>
+  </div>
+</div>
+
+<!-- Filter & Search Toolbar -->
+<div class="card" style="margin-bottom:24px;padding:16px 20px">
+  <form method="get" action="{% url 'dashboard' %}" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
+    <div style="flex:2;min-width:200px">
+      <label style="margin:0 0 4px;font-size:12px" for="id_q">Search Movie or Genre</label>
+      <input type="text" id="id_q" name="q" placeholder="e.g. Inception, Drama, Sci-Fi..." value="{{ q }}">
+    </div>
+
+    <div style="flex:1;min-width:130px">
+      <label style="margin:0 0 4px;font-size:12px" for="id_grade">Trust Grade</label>
+      <select id="id_grade" name="grade">
+        <option value="">All Grades</option>
+        <option value="Excellent" {% if grade_filter == "Excellent" %}selected{% endif %}>Excellent (80+)</option>
+        <option value="Good" {% if grade_filter == "Good" %}selected{% endif %}>Good (65-79)</option>
+        <option value="Fair" {% if grade_filter == "Fair" %}selected{% endif %}>Fair (50-64)</option>
+        <option value="Poor" {% if grade_filter == "Poor" %}selected{% endif %}>Poor (<50)</option>
+      </select>
+    </div>
+
+    <div style="flex:1;min-width:130px">
+      <label style="margin:0 0 4px;font-size:12px" for="id_genre">Genre</label>
+      <select id="id_genre" name="genre">
+        <option value="">All Genres</option>
+        {% for g in genres %}
+          <option value="{{ g }}" {% if genre_filter == g %}selected{% endif %}>{{ g }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div style="flex:1;min-width:130px">
+      <label style="margin:0 0 4px;font-size:12px" for="id_status">Integrity Status</label>
+      <select id="id_status" name="status">
+        <option value="">All Statuses</option>
+        <option value="manipulated" {% if status_filter == "manipulated" %}selected{% endif %}>⚠️ Manipulated</option>
+        <option value="clean" {% if status_filter == "clean" %}selected{% endif %}>✓ Clean</option>
+      </select>
+    </div>
+
+    <div style="flex:1;min-width:130px">
+      <label style="margin:0 0 4px;font-size:12px" for="id_sort">Sort By</label>
+      <select id="id_sort" name="sort">
+        <option value="trust_score" {% if sort == "trust_score" %}selected{% endif %}>Trust Score</option>
+        <option value="rating_inflation" {% if sort == "rating_inflation" %}selected{% endif %}>Inflation Delta</option>
+        <option value="reviews" {% if sort == "reviews" %}selected{% endif %}>Review Count</option>
+        <option value="fake_share" {% if sort == "fake_share" %}selected{% endif %}>Fake Rate %</option>
+        <option value="title" {% if sort == "title" %}selected{% endif %}>Title</option>
+      </select>
+    </div>
+
+    <div style="flex:1;min-width:110px">
+      <label style="margin:0 0 4px;font-size:12px" for="id_order">Order</label>
+      <select id="id_order" name="order">
+        <option value="desc" {% if order == "desc" %}selected{% endif %}>High → Low</option>
+        <option value="asc" {% if order == "asc" %}selected{% endif %}>Low → High</option>
+      </select>
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button type="submit" style="margin-top:0">Filter</button>
+      {% if q or grade_filter or genre_filter or status_filter or sort != "trust_score" %}
+        <a href="{% url 'dashboard' %}" class="btn btn-outline" style="margin-top:0;padding:10px 14px" title="Reset filters">✕</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<!-- Movie Trust Table -->
+<h2>
+  <span>🎬</span> Movie Catalog
+  <span style="font-size:13px;font-weight:600;color:var(--text-muted)">
+    (Showing {{ filtered_count }} of {{ total_movies }} movies)
+  </span>
+</h2>
+
+<div class="table-wrap">
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Movie & Genre</th>
+          <th>Total Reviews</th>
+          <th>Flagged Fake</th>
+          <th>Raw ★ vs Verified ★</th>
+          <th>Inflation Delta</th>
+          <th style="width:190px">Trust Score</th>
+          <th>Grade</th>
+          <th>Status</th>
+          <th style="text-align:right">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in scores %}
+        <tr>
+          <td>
+            <a href="{% url 'movie_detail' s.movie.product_id %}" style="font-weight:700;font-size:14.5px;color:var(--text-primary);text-decoration:none">
+              {{ s.movie.title }}
+            </a>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:3px">
+              <span class="reason" style="margin:0;font-size:11px">{{ s.movie.genre|default:"General" }}</span>
+              <span class="mono" style="font-size:11px;color:var(--text-muted)">{{ s.movie.product_id }}</span>
+            </div>
+          </td>
+          <td class="mono font-bold">{{ s.n_reviews }}</td>
+          <td>
+            <span class="mono {% if s.n_flagged > 0 %}fake{% endif %}" style="font-weight:700">
+              {{ s.n_flagged }}
+            </span>
+            <small class="mono" style="color:var(--text-muted);font-size:11.5px">
+              ({% widthratio s.fake_share 1 100 %}%)
+            </small>
+          </td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="mono" style="color:var(--text-muted);text-decoration:line-through;font-size:12.5px">{{ s.raw_avg|floatformat:2 }}★</span>
+              <span>→</span>
+              <span class="mono" style="font-weight:800;font-size:14px;color:var(--brand)">{{ s.verified_avg|floatformat:2 }}★</span>
+            </div>
+          </td>
+          <td>
+            {% if s.rating_inflation > 0 %}
+              <span class="mono" style="font-weight:700;color:var(--bad)">+{{ s.rating_inflation|floatformat:2 }}★</span>
+            {% elif s.rating_inflation < 0 %}
+              <span class="mono" style="font-weight:700;color:var(--good)">{{ s.rating_inflation|floatformat:2 }}★</span>
+            {% else %}
+              <span class="mono" style="color:var(--text-muted)">0.00★</span>
+            {% endif %}
+          </td>
+          <td>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span class="mono" style="font-weight:800;font-size:15px">{{ s.trust_score|floatformat:1 }}</span>
+              <small style="color:var(--text-muted);font-size:11px">/ 100</small>
+            </div>
+            <div class="bar">
+              <i class="{{ s.grade }}" style="width:{{ s.trust_score }}%;background:currentColor"></i>
+            </div>
+          </td>
+          <td>
+            <span class="pill {{ s.grade }}">{{ s.grade }}</span>
+          </td>
+          <td>
+            {% if s.manipulated %}
+              <span class="pill fake" title="Significant rating discrepancy or fake concentration detected">⚠️ Manipulated</span>
+            {% else %}
+              <span class="pill genuine" title="Review profile shows healthy organic distribution">✓ Clean</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right">
+            <a href="{% url 'movie_detail' s.movie.product_id %}" class="btn btn-outline" style="padding:5px 11px;font-size:12px">Inspect →</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9" style="text-align:center;padding:48px 20px">
+            <div style="font-size:32px;margin-bottom:8px">🔍</div>
+            <div style="font-weight:700;font-size:16px;margin-bottom:4px">No matching movies found</div>
+            <div class="sub" style="margin-bottom:16px">Try clearing your search query or adjusting your grade/status filters.</div>
+            <a href="{% url 'dashboard' %}" class="btn">View All Movies</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
 
 {% if metrics %}
-<h2>Model performance (held-out 25%)</h2>
-<div class="scroll"><table>
-<tr><th>Feature set</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th><th>ROC-AUC</th></tr>
-{% for name, m in metrics.holdout.items %}
-<tr><td>{% if name == "dual" %}<b>dual (text + behaviour)</b>{% else %}{{ name }} only{% endif %}</td>
-<td class="mono">{{ m.accuracy|floatformat:3 }}</td><td class="mono">{{ m.precision|floatformat:3 }}</td>
-<td class="mono">{{ m.recall|floatformat:3 }}</td><td class="mono">{{ m.f1|floatformat:3 }}</td><td class="mono">{{ m.roc_auc|floatformat:3 }}</td></tr>
-{% endfor %}</table></div>
+<!-- Model Performance Section -->
+<h2><span>🧠</span> Dual-Feature Architecture Benchmark (Held-out 25% Split)</h2>
+<p class="sub">Comparison showing how stacking behavioral metadata with NLP stylometry outperforms individual modalities.</p>
+
+<div class="table-wrap" style="margin-bottom:24px">
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Feature Engineering Approach</th>
+          <th>Accuracy</th>
+          <th>Precision</th>
+          <th>Recall</th>
+          <th>F1 Score</th>
+          <th>ROC-AUC</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for name, m in metrics.holdout.items %}
+        <tr {% if name == "dual" %}style="background:rgba(99, 102, 241, 0.08);font-weight:700"{% endif %}>
+          <td>
+            {% if name == "dual" %}
+              <span style="color:var(--brand)">⭐ Dual Stacking (NLP Stylometry + Behavioral Metas)</span>
+            {% elif name == "behavior" %}
+              <span>Behavioral & Velocity Signals Only</span>
+            {% else %}
+              <span>TF-IDF Text Only</span>
+            {% endif %}
+          </td>
+          <td class="mono">{{ m.accuracy|floatformat:3 }}</td>
+          <td class="mono">{{ m.precision|floatformat:3 }}</td>
+          <td class="mono">{{ m.recall|floatformat:3 }}</td>
+          <td class="mono">{{ m.f1|floatformat:3 }}</td>
+          <td class="mono" style="color:var(--brand)"><b>{{ m.roc_auc|floatformat:3 }}</b></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if metrics.top_features %}
+<div class="card">
+  <div class="k" style="margin-bottom:12px"><span>⚡</span> Top Permutation Feature Importances</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px">
+    {% for name, score in metrics.top_features %}
+      <div style="background:var(--bg-card-subtle);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12.5px;display:flex;align-items:center;gap:8px">
+        <span class="mono" style="font-weight:600">{{ name }}</span>
+        <span class="mono" style="font-weight:700;color:var(--brand);font-size:11.5px">+{{ score|floatformat:4 }}</span>
+      </div>
+    {% endfor %}
+  </div>
+</div>
 {% endif %}
+{% endif %}
+
 {% endblock %}
